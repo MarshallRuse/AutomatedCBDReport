@@ -1,9 +1,13 @@
 Option Explicit
 
-Sub Generate_CBD_Report()
+    Dim DataWorkbook As Workbook
+    Dim LookupTable As Workbook
 
+Sub Generate_CBD_Report()
+    Application.ScreenUpdating = False
     Call CBD_Report_Format_Extract
     Call CBD_Report_Create_Pivot_Table
+    Application.ScreenUpdating = True
 
 End Sub
 
@@ -19,8 +23,6 @@ Sub CBD_Report_Format_Extract()
     Dim blankCells As Range
     Dim fd As FileDialog
     Dim fileWasChosen As Boolean
-    Dim DataWorkbook As Workbook
-    Dim LookupTable As Workbook
     
     MsgBox "Choose Extract Dat for the report."
     Set fd = Application.FileDialog(msoFileDialogOpen)
@@ -152,6 +154,11 @@ Sub CBD_Report_Create_Pivot_Table()
 '
 
 '
+
+    Dim pivotTableLastRow As Range
+    Dim firstCell As Range
+    Dim lastCell As Range
+    
     Sheets.Add
     ActiveWorkbook.PivotCaches.Create(SourceType:=xlDatabase, SourceData:= _
         "ExtractTable", Version:=6).CreatePivotTable TableDestination:= _
@@ -171,9 +178,10 @@ Sub CBD_Report_Create_Pivot_Table()
         .Orientation = xlColumnField
         .Position = 1
     End With
-    ActiveSheet.PivotTables("CompletedEPAsPivotTable").AddDataField ActiveSheet.PivotTables( _
-        "CompletedEPAsPivotTable").PivotFields("Entrustment / Overall Category"), _
-        "Count of Entrustment / Overall Category", xlCount
+    With ActiveSheet.PivotTables("CompletedEPAsPivotTable").PivotFields( _
+        "Entrustment / Overall Category")
+        .Orientation = xlDataField
+    End With
     Range("A4").Select
     ActiveSheet.PivotTables("CompletedEPAsPivotTable").CompactLayoutRowHeader = ""
     Range("B3").Select
@@ -231,6 +239,47 @@ Sub CBD_Report_Create_Pivot_Table()
     Selection.FormulaR1C1 = "Total Completed EPAs"
     Range("A2").End(xlDown).Select
     Selection.FormulaR1C1 = "Total Completed EPAs"
+    
+    ' Add the Number of Entrustments Column
+    Range("A2").End(xlToRight).Offset(0, 1).Select
+    Selection.Value = "Number of Entrustments"
+    Set firstCell = Cells(Selection.Offset(1, 0).Row, Selection.Column)
+    Set lastCell = Cells(Range("A2").End(xlDown).Row, Selection.Column)
+    Range(firstCell, lastCell).FormulaR1C1 = "=SUM(RC[-3]:RC[-2])"
+    Selection.Offset(0, -1).EntireColumn.Select
+    Selection.Copy
+    Selection.Offset(0, 1).EntireColumn.Select
+    Selection.PasteSpecial Paste:=xlPasteFormats, Operation:=xlNone, _
+        SkipBlanks:=False, Transpose:=False
+    Application.CutCopyMode = False
+    Selection.EntireColumn.AutoFit
+        
+    ' Add the Target Entrustments Column
+    Range("A2").End(xlToRight).Offset(0, 1).Select
+    Selection.Value = "Target Entrustments"
+    Set firstCell = Cells(Selection.Offset(1, 0).Row, Selection.Column)
+    Set lastCell = Cells(Range("A2").End(xlDown).Row, Selection.Column)
+    Range(firstCell, lastCell).Select
+    Selection.FormulaR1C1 = _
+        "=VLOOKUP(RC1,'[" & LookupTable.Name & "]VLOOKUP MASTER'!C11:C12,2,FALSE)"
+    Selection.SpecialCells(xlCellTypeFormulas, xlErrors).Clear
+    Selection.Offset(0, -1).EntireColumn.Select
+    Selection.Copy
+    Selection.Offset(0, 1).EntireColumn.Select
+    Selection.PasteSpecial Paste:=xlPasteFormats, Operation:=xlNone, _
+        SkipBlanks:=False, Transpose:=False
+    Application.CutCopyMode = False
+    Selection.EntireColumn.AutoFit
+    
+    Selection.Offset(0, -1).EntireColumn.Select
+    Dim c As Range
+    For Each c In Range(Cells(3, Selection.Column), Cells(Range("A2").End(xlDown).Row, Selection.Column))
+        If c.Offset(0, 1).Value > c.Value Then
+            c.Style = "Bad"
+        End If
+    Next c
+    
+    
 End Sub
 
 
