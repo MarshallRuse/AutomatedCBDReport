@@ -1,7 +1,9 @@
 Option Explicit
 
     Dim DataWorkbook As Workbook
+    Dim DataSheet As Worksheet
     Dim LookupTable As Workbook
+    Dim ExtractTable As ListObject
 
 Sub Generate_CBD_Report()
     Application.ScreenUpdating = False
@@ -17,7 +19,7 @@ Sub CBD_Report_Format_Extract()
 '
 
 '
-    Dim ExtractTable As ListObject
+
     Dim newCol As Range
     Dim newHeader As Range
     Dim blankCells As Range
@@ -43,6 +45,7 @@ Sub CBD_Report_Format_Extract()
     End If
     
     Set DataWorkbook = Workbooks.Open(Filename:=fd.SelectedItems(1))
+    Set DataSheet = DataWorkbook.Worksheets(1)
     
     MsgBox "Choose a VLOOKUP Table for the report."
     Set fd = Application.FileDialog(msoFileDialogOpen)
@@ -67,7 +70,7 @@ Sub CBD_Report_Format_Extract()
     
     ' Delete the first 3 rows
     Rows("1:3").Select
-    Selection.Delete shift:=xlUp
+    Selection.Delete Shift:=xlUp
     
     ' Resize all columns
     Cells.Select
@@ -99,7 +102,7 @@ Sub CBD_Report_Format_Extract()
         
     ' Create column EPA Code and Name adjacent to Type of Assessment Form
     ExtractTable.ListColumns("Type of Assessment Form").Range.Select
-    Selection.Insert shift:=xlToRight, CopyOrigin:=xlFormatFromLeftOrAbove
+    Selection.Insert Shift:=xlToRight, CopyOrigin:=xlFormatFromLeftOrAbove
     Set newCol = Selection.EntireColumn
     Set newHeader = newCol.Cells(1)
     newHeader.FormulaR1C1 = "EPA Code and Name"
@@ -110,7 +113,7 @@ Sub CBD_Report_Format_Extract()
     
     ' Create column Site adjacent to Type of Assessment Form
     ExtractTable.ListColumns("Type of Assessment Form").Range.Select
-    Selection.Insert shift:=xlToRight, CopyOrigin:=xlFormatFromLeftOrAbove
+    Selection.Insert Shift:=xlToRight, CopyOrigin:=xlFormatFromLeftOrAbove
     Set newCol = Selection.EntireColumn
     Set newHeader = newCol.Cells(1)
     newHeader.FormulaR1C1 = "Site"
@@ -121,7 +124,7 @@ Sub CBD_Report_Format_Extract()
     
     ' Create column Block adjacent to Type of Assessment Form
     ExtractTable.ListColumns("Type of Assessment Form").Range.Select
-    Selection.Insert shift:=xlToRight, CopyOrigin:=xlFormatFromLeftOrAbove
+    Selection.Insert Shift:=xlToRight, CopyOrigin:=xlFormatFromLeftOrAbove
     Set newCol = Selection.EntireColumn
     Set newHeader = newCol.Cells(1)
     newHeader.FormulaR1C1 = "Block"
@@ -132,7 +135,7 @@ Sub CBD_Report_Format_Extract()
     
     ' Create column Resident from Assessee Lastname and Assessee Firstname
     ExtractTable.ListColumns("Assessee Lastname").Range.EntireColumn.Offset(0, 1).Select
-    Selection.Insert shift:=xlToRight, CopyOrigin:=xlFormatFromLeftOrAbove
+    Selection.Insert Shift:=xlToRight, CopyOrigin:=xlFormatFromLeftOrAbove
     Set newCol = Selection.EntireColumn
     Set newHeader = newCol.Cells(1)
     newHeader.FormulaR1C1 = "Resident"
@@ -279,7 +282,31 @@ Sub CBD_Report_Create_Pivot_Table()
         End If
     Next c
     
+    ExtractTable.ListColumns("2 - 3 Strengths").Range.Replace What:="=-", Replacement:="-.", LookAt _
+        :=xlPart, SearchOrder:=xlByRows, MatchCase:=False, SearchFormat:=False, _
+        ReplaceFormat:=False
     
+    ExtractTable.ListColumns("2 - 3 Actions or areas for improvement").Range.Replace What:="=-", Replacement:="-.", LookAt _
+        :=xlPart, SearchOrder:=xlByRows, MatchCase:=False, SearchFormat:=False, _
+        ReplaceFormat:=False
+    
+End Sub
+
+Sub CBD_Report_Advanced_Combine_Rows()
+
+    Dim newSheet As Worksheet
+    
+    DataWorkbook.Activate
+    ' Create a new worksheet for the results
+    Set newSheet = DataWorkbook.Worksheets.Add
+    
+    ' Get all unique values from Residents Names
+    ExtractTable.ListColumns("Resident").Range.Copy
+    newSheet.Columns("A:A").Select
+    Selection.PasteSpecial Paste:=xlPasteValues, Operation:=xlNone, SkipBlanks _
+        :=False, Transpose:=False
+    Selection.Range("A1", Range("A1").End(xlDown)).RemoveDuplicates Columns:=Array(1), Header:=xlYes
+
 End Sub
 
 
