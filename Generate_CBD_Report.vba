@@ -11,7 +11,13 @@ Sub Generate_CBD_Report()
     Call CBD_Report_Create_Pivot_Table
     Call CBD_Report_Create_Comments_Lookup
     Call CBD_Report_Add_Comments_to_Pivot_Copy
+    Call CBD_Report_Create_Site_Pivot_Table_And_Copy
+    Call CBD_Report_Create_Block_Pivot_Table_And_Copy
+    Call CBD_Report_Cleanup
     Application.ScreenUpdating = True
+    DataWorkbook.Worksheets("ResidentAnalysis").Activate
+    Range("A1").Select
+    Application.CutCopyMode = False
 
 End Sub
 
@@ -62,6 +68,7 @@ Sub CBD_Report_Format_Extract()
     DataWorkbook.SaveAs DataWorkbook.Path & "\" & DataWorkbook.ActiveSheet.Range("B3").Value & _
         "_" & DataWorkbook.ActiveSheet.Range("B2").Value & ".xlsx", 51
     Set DataSheet = DataWorkbook.Worksheets(1)
+    DataSheet.name = "DataExtract"
     
     MsgBox "Choose a VLOOKUP Table for the report."
     Set fd = Application.FileDialog(msoFileDialogOpen)
@@ -165,6 +172,7 @@ Sub CBD_Report_Format_Extract()
     If Not blankCells Is Nothing Then
         blankCells.Delete xlUp
     End If
+    DataWorkbook.Activate
 End Sub
 
 Sub CBD_Report_Create_Pivot_Table()
@@ -174,7 +182,7 @@ Sub CBD_Report_Create_Pivot_Table()
 
 '
     Dim PivotTableSheet As Worksheet
-    Dim ResidentAnalysisSheet As Worksheet
+    Dim ResAnSheet As Worksheet
     Dim pivotTableLastRow As Range
     Dim firstCell As Range
     Dim lastCell As Range
@@ -216,8 +224,8 @@ Sub CBD_Report_Create_Pivot_Table()
     
     Selection.CurrentRegion.Select
     Selection.Copy
-    Set ResidentAnalysisSheet = Sheets.Add(After:=ActiveSheet)
-    ResidentAnalysisSheet.name = "ResidentAnalysis"
+    Set ResAnSheet = Sheets.Add(After:=ActiveSheet)
+    ResAnSheet.name = "ResAn"
     
     Selection.PasteSpecial Paste:=xlPasteFormats, Operation:=xlNone, _
         SkipBlanks:=False, Transpose:=False
@@ -401,9 +409,10 @@ End Sub
 Sub CBD_Report_Add_Comments_to_Pivot_Copy()
     
     Dim CommentsLookupSheet As Worksheet
-    Dim ResAnalysisSheet As Worksheet
+    Dim ResAnSheet As Worksheet
+    Dim ResidentAnalysisSheet As Worksheet
     Dim currCLSCell As Range ' Current CommentsLookupSheet Cell
-    Dim currRASCell As Range ' Current ResAnalysisSheet Cell
+    Dim currRASCell As Range ' Current ResAnSheet Cell
     Dim namesCol As Range
     Dim tmp As String
     Dim cell As Range
@@ -412,7 +421,7 @@ Sub CBD_Report_Add_Comments_to_Pivot_Copy()
     Dim lastCol As Long
     
     Set CommentsLookupSheet = DataWorkbook.Worksheets("CommentsLookup")
-    Set ResAnalysisSheet = DataWorkbook.Worksheets("ResidentAnalysis")
+    Set ResAnSheet = DataWorkbook.Worksheets("ResAn")
     
     ' Get a unique list of the Residents names and store in an array
     CommentsLookupSheet.Activate
@@ -430,12 +439,22 @@ Sub CBD_Report_Add_Comments_to_Pivot_Copy()
     
     names = Split(tmp, "|")
 
-    lastCol = ResAnalysisSheet.Cells(2, Columns.Count).End(xlToLeft).Column
+    lastCol = ResAnSheet.Cells(2, Columns.Count).End(xlToLeft).Column
     
-    Set currRASCell = ResAnalysisSheet.Cells(2, lastCol + 1)
+    Set currRASCell = ResAnSheet.Cells(2, lastCol + 1)
     currRASCell.Value = "Strengths"
     currRASCell.Offset(0, 1) = "Weaknesses"
-    Set currRASCell = currRASCell.Offset(2, 0)
+    
+    
+    ' While I'm here, might as well change the font and resize the row
+    Set currRASCell = currRASCell.Offset(1, 0)
+    With currRASCell.EntireRow
+        .Font.ColorIndex = xlAutomatic
+        .Font.TintAndShade = 0
+        .Font.Bold = True
+        .RowHeight = 24
+    End With
+    Set currRASCell = currRASCell.Offset(1, 0)
     
     Set currCLSCell = CommentsLookupSheet.Range("A2")
     
@@ -446,12 +465,18 @@ Sub CBD_Report_Add_Comments_to_Pivot_Copy()
             Set currRASCell = currRASCell.Offset(1, 0)
             Set currCLSCell = currCLSCell.Offset(1, 0)
         Loop
+        With currRASCell.EntireRow
+            .Font.ColorIndex = xlAutomatic
+            .Font.TintAndShade = 0
+            .Font.Bold = True
+            .RowHeight = 24
+        End With
         Set currRASCell = currRASCell.Offset(1, 0) ' Need to skip a line to ralign on table
     Next nameCounter
     
     
     ' Copy the style format to the new columns
-    ResAnalysisSheet.Activate
+    ResAnSheet.Activate
     currRASCell.EntireColumn.Offset(0, -1).Select
     Selection.Copy
     currRASCell.EntireColumn.Select
@@ -471,6 +496,7 @@ Sub CBD_Report_Add_Comments_to_Pivot_Copy()
     With Selection
         .ColumnWidth = 80
         .HorizontalAlignment = xlGeneral
+        .Cells(2, 0).HorizontalAlignment = xlCenter ' The header
         .WrapText = True
         .Orientation = 0
         .AddIndent = False
@@ -485,6 +511,7 @@ Sub CBD_Report_Add_Comments_to_Pivot_Copy()
     With Selection
         .ColumnWidth = 80
         .HorizontalAlignment = xlGeneral
+        .Cells(2, 1).HorizontalAlignment = xlCenter ' The header
         .WrapText = True
         .Orientation = 0
         .AddIndent = False
@@ -518,5 +545,170 @@ Sub CBD_Report_Add_Comments_to_Pivot_Copy()
         .ReadingOrder = xlContext
         .MergeCells = False
     End With
-    Range("A4").Select
+    
+    ' Copy by values to new sheet
+    Range("A4").CurrentRegion.Select
+    Selection.Copy
+    
+    Set ResidentAnalysisSheet = DataWorkbook.Worksheets.Add
+    ResidentAnalysisSheet.name = "ResidentAnalysis"
+    DataWorkbook.Worksheets("ResidentAnalysis").Select
+    
+    Range("A1").Select
+    Selection.PasteSpecial Paste:=xlPasteFormats, Operation:=xlNone, _
+        SkipBlanks:=False, Transpose:=False
+    Selection.PasteSpecial Paste:=xlPasteValues, Operation:=xlNone, SkipBlanks _
+        :=False, Transpose:=False
+    Cells.Select
+    Cells.EntireColumn.AutoFit
+    Selection.Rows.AutoFit
+    
+    Range("B2").End(xlToRight).EntireColumn.ColumnWidth = 80
+    Range("B2").End(xlToRight).EntireColumn.Offset(0, -1).ColumnWidth = 80
+    Range("B2").End(xlToRight).EntireColumn.Offset(0, -2).AutoFit
+    Columns("A:A").ColumnWidth = 80
+    
+End Sub
+
+Sub CBD_Report_Create_Site_Pivot_Table_And_Copy()
+
+    Dim PivotTableSheet As Worksheet
+    Dim SiteSheet As Worksheet
+    Dim cell As Range
+    Dim i As Long
+    
+    DataWorkbook.Activate
+    Set PivotTableSheet = Worksheets("PivotTable")
+    
+    ActiveWorkbook.PivotCaches.Create(SourceType:=xlDatabase, SourceData:= _
+        "ExtractTable", Version:=6).CreatePivotTable TableDestination:= _
+        "PivotTable!R3C9", TableName:="SitePivotTable", DefaultVersion:=6
+        
+    Sheets("PivotTable").Select
+    Cells(3, 9).Select
+    
+    With ActiveSheet.PivotTables("SitePivotTable").PivotFields("Site")
+        .Orientation = xlRowField
+        .Position = 1
+    End With
+    With ActiveSheet.PivotTables("SitePivotTable").PivotFields("Block")
+        .Orientation = xlRowField
+        .Position = 2
+    End With
+    With ActiveSheet.PivotTables("SitePivotTable").PivotFields("Entrustment / Overall Category")
+        .Orientation = xlColumnField
+        .Position = 1
+    End With
+    With ActiveSheet.PivotTables("SitePivotTable").PivotFields("Entrustment / Overall Category")
+        .Orientation = xlDataField
+    End With
+    
+    With ActiveSheet.PivotTables("SitePivotTable")
+        .CompactLayoutRowHeader = ""
+        .CompactLayoutColumnHeader = ""
+        .TableStyle2 = "PivotStyleMedium2"
+    End With
+    
+    Range("I3").Select
+    Selection.CurrentRegion.Select
+    Selection.Copy
+    
+    Set SiteSheet = Sheets.Add(After:=Worksheets("ResidentAnalysis"))
+    SiteSheet.name = "SiteAnalysis"
+    
+    Selection.PasteSpecial Paste:=xlPasteFormats, Operation:=xlNone, _
+        SkipBlanks:=False, Transpose:=False
+    Selection.PasteSpecial Paste:=xlPasteValues, Operation:=xlNone, SkipBlanks _
+        :=False, Transpose:=False
+    
+    Cells.EntireColumn.AutoFit
+    
+    For i = 0 To Range("A3", Range("A3").End(xlDown)).Count
+        Set cell = Range("A3").Offset(i, 0)
+        If (Left(cell.Value, 6) <> "Block ") Then
+            With cell.EntireRow
+                .Font.ColorIndex = xlAutomatic
+                .Font.Bold = True
+            End With
+        End If
+    Next i
+    
+    Range("A1").Select
+End Sub
+
+
+Sub CBD_Report_Create_Block_Pivot_Table_And_Copy()
+
+    Dim PivotTableSheet As Worksheet
+    Dim BlockSheet As Worksheet
+    Dim cell As Range
+    Dim i As Long
+    
+    DataWorkbook.Activate
+    Set PivotTableSheet = Worksheets("PivotTable")
+    
+    ActiveWorkbook.PivotCaches.Create(SourceType:=xlDatabase, SourceData:= _
+        "ExtractTable", Version:=6).CreatePivotTable TableDestination:= _
+        "PivotTable!R3C18", TableName:="BlockPivotTable", DefaultVersion:=6
+        
+    Sheets("PivotTable").Select
+    Cells(3, 18).Select
+    
+    With ActiveSheet.PivotTables("BlockPivotTable").PivotFields("Resident")
+        .Orientation = xlRowField
+        .Position = 1
+    End With
+    With ActiveSheet.PivotTables("BlockPivotTable").PivotFields("Block")
+        .Orientation = xlRowField
+        .Position = 2
+    End With
+    With ActiveSheet.PivotTables("BlockPivotTable").PivotFields("Entrustment / Overall Category")
+        .Orientation = xlColumnField
+        .Position = 1
+    End With
+    With ActiveSheet.PivotTables("BlockPivotTable").PivotFields("Entrustment / Overall Category")
+        .Orientation = xlDataField
+    End With
+    
+    With ActiveSheet.PivotTables("BlockPivotTable")
+        .CompactLayoutRowHeader = ""
+        .CompactLayoutColumnHeader = ""
+        .TableStyle2 = "PivotStyleMedium2"
+    End With
+    
+    Range("R3").Select
+    Selection.CurrentRegion.Select
+    Selection.Copy
+    
+    Set BlockSheet = Sheets.Add(After:=Worksheets("SiteAnalysis"))
+    BlockSheet.name = "BlockAnalysis"
+    
+    Selection.PasteSpecial Paste:=xlPasteFormats, Operation:=xlNone, _
+        SkipBlanks:=False, Transpose:=False
+    Selection.PasteSpecial Paste:=xlPasteValues, Operation:=xlNone, SkipBlanks _
+        :=False, Transpose:=False
+    
+    Cells.EntireColumn.AutoFit
+    
+    For i = 0 To Range("A3", Range("A3").End(xlDown)).Count
+        Set cell = Range("A3").Offset(i, 0)
+        If (Left(cell.Value, 6) <> "Block ") Then
+            With cell.EntireRow
+                .Font.ColorIndex = xlAutomatic
+                .Font.Bold = True
+            End With
+        End If
+    Next i
+    
+    Range("A1").Select
+End Sub
+
+Sub CBD_Report_Cleanup()
+    Application.DisplayAlerts = False
+    DataWorkbook.Worksheets("PivotTable").Delete
+    DataWorkbook.Worksheets("CommentsLookup").Delete
+    DataWorkbook.Worksheets("ResAn").Delete
+    DataWorkbook.Worksheets("DataExtract").Delete
+    LookupTable.Close
+    Application.DisplayAlerts = True
 End Sub
