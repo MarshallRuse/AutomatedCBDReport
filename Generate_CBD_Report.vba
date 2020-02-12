@@ -52,7 +52,7 @@ Sub CBD_Report_Format_Extract()
     
     If Not fileWasChosen Then
         MsgBox "You didn't choose an Extract Data File. Report generation was terminated."
-        Exit Sub
+        End
     End If
     
     ' Creates a copy of the extract data to preserve the original. Stored in a variable for reference when
@@ -68,7 +68,7 @@ Sub CBD_Report_Format_Extract()
     DataWorkbook.SaveAs DataWorkbook.Path & "\" & DataWorkbook.ActiveSheet.Range("B3").Value & _
         "_" & DataWorkbook.ActiveSheet.Range("B2").Value & ".xlsx", 51
     Set DataSheet = DataWorkbook.Worksheets(1)
-    DataSheet.name = "DataExtract"
+    DataSheet.Name = "DataExtract"
     
     MsgBox "Choose a VLOOKUP Table for the report."
     Set fd = Application.FileDialog(msoFileDialogOpen)
@@ -85,7 +85,7 @@ Sub CBD_Report_Format_Extract()
     
     If Not fileWasChosen Then
         MsgBox "You didn't choose a Lookup Table. Report generation was terminated."
-        Exit Sub
+        End
     End If
     
     Set LookupTable = Workbooks.Open(Filename:=fd.SelectedItems(1))
@@ -101,7 +101,7 @@ Sub CBD_Report_Format_Extract()
     
     ' Create a table from the data for ease of manipulation - allows use of column
     ' header names for flexibility
-    ActiveSheet.ListObjects.Add(xlSrcRange, Range("A1").CurrentRegion, , xlYes).name = _
+    ActiveSheet.ListObjects.Add(xlSrcRange, Range("A1").CurrentRegion, , xlYes).Name = _
         "ExtractTable"
     Set ExtractTable = ActiveSheet.ListObjects("ExtractTable")
 
@@ -131,8 +131,20 @@ Sub CBD_Report_Format_Extract()
     newHeader.FormulaR1C1 = "EPA Code and Name"
     ActiveCell.Offset(1, 0).Select
     ActiveCell.FormulaR1C1 = _
-        "=VLOOKUP([@[Assessment Form Code]],'[" & LookupTable.name & "]VLOOKUP MASTER'!C1:C11,11,FALSE)"
+        "=IFERROR(VLOOKUP([@[Assessment Form Code]],'[" & LookupTable.Name & "]VLOOKUP MASTER'!C1:C11,11,FALSE), ""NONEXISTANT_FORM_ID"")"
     ExtractTable.ListColumns("EPA Code and Name").Range.EntireColumn.AutoFit
+    
+    'Loop through and make sure all EPA Codes are accounted for
+        ' Filter
+    ExtractTable.ListColumns("EPA Code and Name").Range.AutoFilter Field:=ExtractTable.ListColumns("EPA Code and Name").Range.Column, Criteria1 _
+        :="NONEXISTANT_FORM_ID"
+    If ExtractTable.ListColumns("EPA Code and Name").Range.Cells(1, 0).Count > 1 Then
+        MsgBox Prompt:="Some Assessment Form Codes could not be found in the Lookup Table.  To find the erroneous codes, filter" & _
+            " Assessment Form Code to NONEXISTANT_FORM_ID, and fix the corresponding Assessment Form Codes in the Lookup Table, or else delete the offending rows."
+        End
+    End If
+    ActiveSheet.ListObjects("ExtractTable").Range.AutoFilter Field:=ExtractTable.ListColumns("EPA Code and Name").Range.Column ' Unfilter
+
     
     ' Create column Site adjacent to Type of Assessment Form
     ExtractTable.ListColumns("Type of Assessment Form").Range.Select
@@ -142,7 +154,7 @@ Sub CBD_Report_Format_Extract()
     newHeader.FormulaR1C1 = "Site"
     ActiveCell.Offset(1, 0).Select
     ActiveCell.FormulaR1C1 = _
-        "=VLOOKUP([@[CV ID 9533 : Site]],'[" & LookupTable.name & "]Site'!C1:C2,2,FALSE)"
+        "=VLOOKUP([@[CV ID 9533 : Site]],'[" & LookupTable.Name & "]Site'!C1:C2,2,FALSE)"
     ExtractTable.ListColumns("Site").Range.EntireColumn.AutoFit
     
     ' Create column Block adjacent to Type of Assessment Form
@@ -153,7 +165,7 @@ Sub CBD_Report_Format_Extract()
     newHeader.FormulaR1C1 = "Block"
     ActiveCell.Offset(1, 0).Select
     ActiveCell.FormulaR1C1 = _
-        "=VLOOKUP([@[Date of encounter]],'[" & LookupTable.name & "]BLOCK'!C2:C6,3,TRUE)"
+        "=VLOOKUP([@[Date of encounter]],'[" & LookupTable.Name & "]BLOCK'!C2:C6,3,TRUE)"
     ExtractTable.ListColumns("Block").Range.EntireColumn.AutoFit
     
     ' Create column Resident from Assessee Lastname and Assessee Firstname
@@ -188,7 +200,7 @@ Sub CBD_Report_Create_Pivot_Table()
     Dim lastCell As Range
     
     DataWorkbook.Activate
-    Sheets.Add.name = "PivotTable"
+    Sheets.Add.Name = "PivotTable"
     Set PivotTableSheet = Worksheets("PivotTable")
     ActiveWorkbook.PivotCaches.Create(SourceType:=xlDatabase, SourceData:= _
         "ExtractTable", Version:=6).CreatePivotTable TableDestination:= _
@@ -225,7 +237,7 @@ Sub CBD_Report_Create_Pivot_Table()
     Selection.CurrentRegion.Select
     Selection.Copy
     Set ResAnSheet = Sheets.Add(After:=ActiveSheet)
-    ResAnSheet.name = "ResAn"
+    ResAnSheet.Name = "ResAn"
     
     Selection.PasteSpecial Paste:=xlPasteFormats, Operation:=xlNone, _
         SkipBlanks:=False, Transpose:=False
@@ -296,7 +308,7 @@ Sub CBD_Report_Create_Pivot_Table()
     Set lastCell = Cells(Range("A2").End(xlDown).Row, Selection.Column)
     Range(firstCell, lastCell).Select
     Selection.FormulaR1C1 = _
-        "=VLOOKUP(RC1,'[" & LookupTable.name & "]VLOOKUP MASTER'!C11:C12,2,FALSE)"
+        "=VLOOKUP(RC1,'[" & LookupTable.Name & "]VLOOKUP MASTER'!C11:C12,2,FALSE)"
     Selection.SpecialCells(xlCellTypeFormulas, xlErrors).Clear
     Selection.Offset(0, -1).EntireColumn.Select
     Selection.Copy
@@ -336,7 +348,7 @@ Sub CBD_Report_Create_Comments_Lookup()
     DataWorkbook.Activate
     ' Create a new worksheet for the results
     Set newSheet = DataWorkbook.Worksheets.Add
-    newSheet.name = "CommentsLookup"
+    newSheet.Name = "CommentsLookup"
     
     ' Get all values from Residents Names
     ExtractTable.ListColumns("Resident").Range.Copy
@@ -551,7 +563,7 @@ Sub CBD_Report_Add_Comments_to_Pivot_Copy()
     Selection.Copy
     
     Set ResidentAnalysisSheet = DataWorkbook.Worksheets.Add
-    ResidentAnalysisSheet.name = "ResidentAnalysis"
+    ResidentAnalysisSheet.Name = "ResidentAnalysis"
     DataWorkbook.Worksheets("ResidentAnalysis").Select
     
     Range("A1").Select
@@ -614,7 +626,7 @@ Sub CBD_Report_Create_Site_Pivot_Table_And_Copy()
     Selection.Copy
     
     Set SiteSheet = Sheets.Add(After:=Worksheets("ResidentAnalysis"))
-    SiteSheet.name = "SiteAnalysis"
+    SiteSheet.Name = "SiteAnalysis"
     
     Selection.PasteSpecial Paste:=xlPasteFormats, Operation:=xlNone, _
         SkipBlanks:=False, Transpose:=False
@@ -681,7 +693,7 @@ Sub CBD_Report_Create_Block_Pivot_Table_And_Copy()
     Selection.Copy
     
     Set BlockSheet = Sheets.Add(After:=Worksheets("SiteAnalysis"))
-    BlockSheet.name = "BlockAnalysis"
+    BlockSheet.Name = "BlockAnalysis"
     
     Selection.PasteSpecial Paste:=xlPasteFormats, Operation:=xlNone, _
         SkipBlanks:=False, Transpose:=False
@@ -712,3 +724,4 @@ Sub CBD_Report_Cleanup()
     LookupTable.Close
     Application.DisplayAlerts = True
 End Sub
+
