@@ -246,7 +246,7 @@ Sub CBD_Report_Format_Extract()
             ' Ask the user what the Training Level is for this Resident
             trainingLevel = ""
             proceed = False
-            'MacroLaunchWorkbook.Activate
+            MacroLaunchWorkbook.Activate
             While Not proceed
                 DoEvents
             Wend
@@ -259,14 +259,7 @@ Sub CBD_Report_Format_Extract()
                     DataWorkbook.Worksheets("DataExtract").Cells(.Range.End(xlDown).Row, .Index)).Cells.SpecialCells(xlCellTypeVisible).Value = trainingLevel
             End With
         Next name
-        
-        
-        'Dim errorCellsCount As Long
-        'errorCellsCount = ExtractTable.ListColumns("Assessee Training Level").Range.Cells(1, 0).Count
-        '
-        'Do While errorCellsCount > 1
-        '
-        'Loop
+
     End If
     DataWorkbook.Worksheets("DataExtract").ListObjects("ExtractTable").AutoFilter.ShowAllData ' Unfilter
     Application.ScreenUpdating = False
@@ -285,9 +278,13 @@ Sub CBD_Report_Create_Pivot_Table()
     Dim EPATypebyBlockSheet As Worksheet
     Dim EPATypebySiteSheet As Worksheet
     Dim CompletionBySiteAndBlockSheet As Worksheet
+    Dim WithoutCOD5CompletionBySiteAndBlockSheet As Worksheet
     Dim CompletionByRotationAndBlockSheet As Worksheet
+    Dim WithoutCOD5CompletionByRotationAndBlockSheet As Worksheet
     Dim CompletionByBlockAndCohortSheet As Worksheet
     Dim CompletionByRotationAndEPASheet As Worksheet
+    Dim CTUCompletionbyBlockSheet As Worksheet
+    Dim WithoutCOD5CTUCompletionbyBlockSheet As Worksheet
     
     Dim ResAnSheet As Worksheet
     Dim pivotTableLastRow As Range
@@ -688,6 +685,85 @@ Sub CBD_Report_Create_Pivot_Table()
     Selection.Font.TintAndShade = 0
     
     
+    ' Create the WITHOUT COD5 - Completion by Site and Block Pivot Table
+    
+    DataWorkbook.Activate
+    Sheets.Add.name = "NO-COD5 Cmpltn by Site & Blck"
+    Set WithoutCOD5CompletionBySiteAndBlockSheet = Worksheets("NO-COD5 Cmpltn by Site & Blck")
+    CompletionBySiteAndBlockSheet.Move Before:=DataSheet
+    DataWorkbook.PivotCaches.Create(SourceType:=xlDatabase, SourceData:= _
+        "ExtractTable", Version:=6).CreatePivotTable TableDestination:= _
+        "'NO-COD5 Cmpltn by Site & Blck'!R3C1", TableName:="WithoutCOD5CompletionbySiteAndBlockTable", DefaultVersion:=6
+    Sheets("NO-COD5 Cmpltn by Site & Blck").Select
+    Cells(3, 1).Select
+    With ActiveSheet.PivotTables("WithoutCOD5CompletionbySiteAndBlockTable").PivotFields("Site")
+        .Orientation = xlRowField
+        .Position = 1
+        .ClearAllFilters
+    End With
+    With ActiveSheet.PivotTables("WithoutCOD5CompletionbySiteAndBlockTable").PivotFields("Block")
+        .Orientation = xlRowField
+        .Position = 2
+    End With
+    With ActiveSheet.PivotTables("WithoutCOD5CompletionbySiteAndBlockTable").PivotFields( _
+        "Entrustment / Overall Category")
+        .Orientation = xlColumnField
+        .Position = 1
+        For i = 1 To .PivotItems.Count
+            If .PivotItems(i).name = "(blank)" Then
+                .PivotItems(.PivotItems(i).name).Visible = False
+            End If
+        Next i
+    End With
+    With ActiveSheet.PivotTables("WithoutCOD5CompletionbySiteAndBlockTable").PivotFields( _
+        "Entrustment / Overall Category")
+        .Orientation = xlDataField
+    End With
+    With ActiveSheet.PivotTables("WithoutCOD5CompletionbySiteAndBlockTable").PivotFields( _
+        "EPA Code and Name")
+        .Orientation = xlPageField
+        .Position = 1
+        .EnableMultiplePageItems = True
+        .CurrentPage = "(All)"
+        .PivotItems("COD-05 Performing the procedures of Internal Medicine"). _
+            Visible = False
+    End With
+    ' Add the title to the Pivot Table
+    ActiveSheet.PivotTables("WithoutCOD5CompletionbySiteAndBlockTable").DataPivotField.PivotItems( _
+        "Count of Entrustment / Overall Category").Caption = _
+        "WITHOUT COD5 - Completion by Site & Block"
+    ' Remove the default labels
+    With ActiveSheet.PivotTables("WithoutCOD5CompletionbySiteAndBlockTable")
+        .CompactLayoutRowHeader = ""
+        .CompactLayoutColumnHeader = ""
+        .TableStyle2 = "PivotStyleMedium2"
+    End With
+    ' Add bold font and vertical borders for legibility
+    With Range("A3").CurrentRegion
+        .Font.Bold = True
+        .Borders(xlDiagonalDown).LineStyle = xlNone
+        .Borders(xlDiagonalUp).LineStyle = xlNone
+        .Borders(xlEdgeLeft).LineStyle = xlNone
+        .Borders(xlEdgeTop).LineStyle = xlNone
+        .Borders(xlEdgeBottom).LineStyle = xlNone
+        .Borders(xlEdgeRight).LineStyle = xlNone
+        .Borders(xlInsideHorizontal).LineStyle = xlNone
+        With .Borders(xlInsideVertical)
+            .LineStyle = xlContinuous
+            .ColorIndex = xlAutomatic
+            .TintAndShade = 0
+            .Weight = xlThin
+        End With
+    End With
+    ActiveSheet.PivotTables("WithoutCOD5CompletionbySiteAndBlockTable").PivotSelect _
+        "'Block'[All]", xlLabelOnly + xlFirstRow, True
+    Selection.Font.Bold = False
+    ActiveSheet.PivotTables("WithoutCOD5CompletionbySiteAndBlockTable").PivotSelect _
+        "'Site'[All]", xlLabelOnly + xlFirstRow, True
+    Selection.Font.ColorIndex = xlAutomatic
+    Selection.Font.TintAndShade = 0
+    
+    
     ' Create the Completion by Rotation and Block Pivot Table
     
     DataWorkbook.Activate
@@ -753,6 +829,241 @@ Sub CBD_Report_Create_Pivot_Table()
         "'Block'[All]", xlLabelOnly + xlFirstRow, True
     Selection.Font.Bold = False
     ActiveSheet.PivotTables("CompletionbyRotationAndBlockTable").PivotSelect _
+        "'CV ID 9530 : Rotation Service'[All]", xlLabelOnly + xlFirstRow, True
+    Selection.Font.ColorIndex = xlAutomatic
+    Selection.Font.TintAndShade = 0
+    
+    ' Create the WITHOUT COD5 - Completion by Rotation and Block Pivot Table
+    
+    DataWorkbook.Activate
+    Sheets.Add.name = "NO-COD5 Cmpltn by Rot. & Blck"
+    Set WithoutCOD5CompletionByRotationAndBlockSheet = Worksheets("NO-COD5 Cmpltn by Rot. & Blck")
+    CompletionByRotationAndBlockSheet.Move Before:=DataSheet
+    DataWorkbook.PivotCaches.Create(SourceType:=xlDatabase, SourceData:= _
+        "ExtractTable", Version:=6).CreatePivotTable TableDestination:= _
+        "'NO-COD5 Cmpltn by Rot. & Blck'!R3C1", TableName:="WithoutCOD5CompletionbyRotationAndBlockTable", DefaultVersion:=6
+    Sheets("NO-COD5 Cmpltn by Rot. & Blck").Select
+    Cells(3, 1).Select
+    With ActiveSheet.PivotTables("WithoutCOD5CompletionbyRotationAndBlockTable").PivotFields("CV ID 9530 : Rotation Service")
+        .Orientation = xlRowField
+        .Position = 1
+        .ClearAllFilters
+    End With
+    With ActiveSheet.PivotTables("WithoutCOD5CompletionbyRotationAndBlockTable").PivotFields("Block")
+        .Orientation = xlRowField
+        .Position = 2
+    End With
+    With ActiveSheet.PivotTables("WithoutCOD5CompletionbyRotationAndBlockTable").PivotFields( _
+        "Entrustment / Overall Category")
+        .Orientation = xlColumnField
+        .Position = 1
+        For i = 1 To .PivotItems.Count
+            If .PivotItems(i).name = "(blank)" Then
+                .PivotItems(.PivotItems(i).name).Visible = False
+            End If
+        Next i
+    End With
+    With ActiveSheet.PivotTables("WithoutCOD5CompletionbyRotationAndBlockTable").PivotFields( _
+        "Entrustment / Overall Category")
+        .Orientation = xlDataField
+    End With
+    With ActiveSheet.PivotTables("WithoutCOD5CompletionbyRotationAndBlockTable").PivotFields( _
+        "EPA Code and Name")
+        .Orientation = xlPageField
+        .Position = 1
+        .EnableMultiplePageItems = True
+        .CurrentPage = "(All)"
+        .PivotItems("COD-05 Performing the procedures of Internal Medicine"). _
+            Visible = False
+    End With
+    ' Add the title to the Pivot Table
+    ActiveSheet.PivotTables("WithoutCOD5CompletionbyRotationAndBlockTable").DataPivotField.PivotItems( _
+        "Count of Entrustment / Overall Category").Caption = _
+        "WITHOUT COD5 - Completion by Rotation and Block"
+    ' Remove the default labels
+    With ActiveSheet.PivotTables("WithoutCOD5CompletionbyRotationAndBlockTable")
+        .CompactLayoutRowHeader = ""
+        .CompactLayoutColumnHeader = ""
+        .TableStyle2 = "PivotStyleMedium2"
+    End With
+    ' Add bold font and vertical borders for legibility
+    With Range("A3").CurrentRegion
+        .Font.Bold = True
+        .Borders(xlDiagonalDown).LineStyle = xlNone
+        .Borders(xlDiagonalUp).LineStyle = xlNone
+        .Borders(xlEdgeLeft).LineStyle = xlNone
+        .Borders(xlEdgeTop).LineStyle = xlNone
+        .Borders(xlEdgeBottom).LineStyle = xlNone
+        .Borders(xlEdgeRight).LineStyle = xlNone
+        .Borders(xlInsideHorizontal).LineStyle = xlNone
+        With .Borders(xlInsideVertical)
+            .LineStyle = xlContinuous
+            .ColorIndex = xlAutomatic
+            .TintAndShade = 0
+            .Weight = xlThin
+        End With
+    End With
+    ActiveSheet.PivotTables("WithoutCOD5CompletionbyRotationAndBlockTable").PivotSelect _
+        "'Block'[All]", xlLabelOnly + xlFirstRow, True
+    Selection.Font.Bold = False
+    ActiveSheet.PivotTables("WithoutCOD5CompletionbyRotationAndBlockTable").PivotSelect _
+        "'CV ID 9530 : Rotation Service'[All]", xlLabelOnly + xlFirstRow, True
+    Selection.Font.ColorIndex = xlAutomatic
+    Selection.Font.TintAndShade = 0
+    
+    ' Create the CTU (GIM) Completion by Block Pivot Table
+    
+    DataWorkbook.Activate
+    Sheets.Add.name = "CTU (GIM) Completion by Block"
+    Set CTUCompletionbyBlockSheet = Worksheets("CTU (GIM) Completion by Block")
+    CompletionByRotationAndBlockSheet.Move Before:=DataSheet
+    DataWorkbook.PivotCaches.Create(SourceType:=xlDatabase, SourceData:= _
+        "ExtractTable", Version:=6).CreatePivotTable TableDestination:= _
+        "'CTU (GIM) Completion by Block'!R3C1", TableName:="CTUCompletionbyBlockTable", DefaultVersion:=6
+    Sheets("CTU (GIM) Completion by Block").Select
+    Cells(3, 1).Select
+    With ActiveSheet.PivotTables("CTUCompletionbyBlockTable").PivotFields("CV ID 9530 : Rotation Service")
+        .Orientation = xlRowField
+        .Position = 1
+        .ClearAllFilters
+        For i = 1 To .PivotItems.Count
+            If .PivotItems(i).name <> "GIM" Then
+                .PivotItems(.PivotItems(i).name).Visible = False
+            End If
+        Next i
+    End With
+    With ActiveSheet.PivotTables("CTUCompletionbyBlockTable").PivotFields("Block")
+        .Orientation = xlRowField
+        .Position = 2
+    End With
+    With ActiveSheet.PivotTables("CTUCompletionbyBlockTable").PivotFields( _
+        "Entrustment / Overall Category")
+        .Orientation = xlColumnField
+        .Position = 1
+        For i = 1 To .PivotItems.Count
+            If .PivotItems(i).name = "(blank)" Then
+                .PivotItems(.PivotItems(i).name).Visible = False
+            End If
+        Next i
+    End With
+    With ActiveSheet.PivotTables("CTUCompletionbyBlockTable").PivotFields( _
+        "Entrustment / Overall Category")
+        .Orientation = xlDataField
+    End With
+    ' Add the title to the Pivot Table
+    ActiveSheet.PivotTables("CTUCompletionbyBlockTable").DataPivotField.PivotItems( _
+        "Count of Entrustment / Overall Category").Caption = _
+        "CTU Completion by Block"
+    ' Remove the default labels
+    With ActiveSheet.PivotTables("CTUCompletionbyBlockTable")
+        .CompactLayoutRowHeader = ""
+        .CompactLayoutColumnHeader = ""
+        .TableStyle2 = "PivotStyleMedium2"
+    End With
+    ' Add bold font and vertical borders for legibility
+    With Range("A3").CurrentRegion
+        .Font.Bold = True
+        .Borders(xlDiagonalDown).LineStyle = xlNone
+        .Borders(xlDiagonalUp).LineStyle = xlNone
+        .Borders(xlEdgeLeft).LineStyle = xlNone
+        .Borders(xlEdgeTop).LineStyle = xlNone
+        .Borders(xlEdgeBottom).LineStyle = xlNone
+        .Borders(xlEdgeRight).LineStyle = xlNone
+        .Borders(xlInsideHorizontal).LineStyle = xlNone
+        With .Borders(xlInsideVertical)
+            .LineStyle = xlContinuous
+            .ColorIndex = xlAutomatic
+            .TintAndShade = 0
+            .Weight = xlThin
+        End With
+    End With
+    ActiveSheet.PivotTables("CTUCompletionbyBlockTable").PivotSelect _
+        "'Block'[All]", xlLabelOnly + xlFirstRow, True
+    Selection.Font.Bold = False
+    ActiveSheet.PivotTables("CTUCompletionbyBlockTable").PivotSelect _
+        "'CV ID 9530 : Rotation Service'[All]", xlLabelOnly + xlFirstRow, True
+    Selection.Font.ColorIndex = xlAutomatic
+    Selection.Font.TintAndShade = 0
+    
+    ' Create the WITHOUT COD5 CTU (GIM) Completion by Block Pivot Table
+    
+    DataWorkbook.Activate
+    Sheets.Add.name = "NO-COD5 CTU Cmpltn by Blck"
+    Set WithoutCOD5CTUCompletionbyBlockSheet = Worksheets("NO-COD5 CTU Cmpltn by Blck")
+    CompletionByRotationAndBlockSheet.Move Before:=DataSheet
+    DataWorkbook.PivotCaches.Create(SourceType:=xlDatabase, SourceData:= _
+        "ExtractTable", Version:=6).CreatePivotTable TableDestination:= _
+        "'NO-COD5 CTU Cmpltn by Blck'!R3C1", TableName:="WithoutCOD5CTUCompletionbyBlockTable", DefaultVersion:=6
+    Sheets("NO-COD5 CTU Cmpltn by Blck").Select
+    Cells(3, 1).Select
+    With ActiveSheet.PivotTables("WithoutCOD5CTUCompletionbyBlockTable").PivotFields("CV ID 9530 : Rotation Service")
+        .Orientation = xlRowField
+        .Position = 1
+        .ClearAllFilters
+        For i = 1 To .PivotItems.Count
+            If .PivotItems(i).name <> "GIM" Then
+                .PivotItems(.PivotItems(i).name).Visible = False
+            End If
+        Next i
+    End With
+    With ActiveSheet.PivotTables("WithoutCOD5CTUCompletionbyBlockTable").PivotFields("Block")
+        .Orientation = xlRowField
+        .Position = 2
+    End With
+    With ActiveSheet.PivotTables("WithoutCOD5CTUCompletionbyBlockTable").PivotFields( _
+        "Entrustment / Overall Category")
+        .Orientation = xlColumnField
+        .Position = 1
+        For i = 1 To .PivotItems.Count
+            If .PivotItems(i).name = "(blank)" Then
+                .PivotItems(.PivotItems(i).name).Visible = False
+            End If
+        Next i
+    End With
+    With ActiveSheet.PivotTables("WithoutCOD5CTUCompletionbyBlockTable").PivotFields( _
+        "Entrustment / Overall Category")
+        .Orientation = xlDataField
+    End With
+    With ActiveSheet.PivotTables("WithoutCOD5CTUCompletionbyBlockTable").PivotFields( _
+        "EPA Code and Name")
+        .Orientation = xlPageField
+        .Position = 1
+        .EnableMultiplePageItems = True
+        .CurrentPage = "(All)"
+        .PivotItems("COD-05 Performing the procedures of Internal Medicine"). _
+            Visible = False
+    End With
+    ' Add the title to the Pivot Table
+    ActiveSheet.PivotTables("WithoutCOD5CTUCompletionbyBlockTable").DataPivotField.PivotItems( _
+        "Count of Entrustment / Overall Category").Caption = _
+        "WITHOUT COD5 - CTU Completion by Block"
+    ' Remove the default labels
+    With ActiveSheet.PivotTables("WithoutCOD5CTUCompletionbyBlockTable")
+        .CompactLayoutRowHeader = ""
+        .CompactLayoutColumnHeader = ""
+        .TableStyle2 = "PivotStyleMedium2"
+    End With
+    ' Add bold font and vertical borders for legibility
+    With Range("A3").CurrentRegion
+        .Font.Bold = True
+        .Borders(xlDiagonalDown).LineStyle = xlNone
+        .Borders(xlDiagonalUp).LineStyle = xlNone
+        .Borders(xlEdgeLeft).LineStyle = xlNone
+        .Borders(xlEdgeTop).LineStyle = xlNone
+        .Borders(xlEdgeBottom).LineStyle = xlNone
+        .Borders(xlEdgeRight).LineStyle = xlNone
+        .Borders(xlInsideHorizontal).LineStyle = xlNone
+        With .Borders(xlInsideVertical)
+            .LineStyle = xlContinuous
+            .ColorIndex = xlAutomatic
+            .TintAndShade = 0
+            .Weight = xlThin
+        End With
+    End With
+    ActiveSheet.PivotTables("WithoutCOD5CTUCompletionbyBlockTable").PivotSelect _
+        "'Block'[All]", xlLabelOnly + xlFirstRow, True
+    Selection.Font.Bold = False
+    ActiveSheet.PivotTables("WithoutCOD5CTUCompletionbyBlockTable").PivotSelect _
         "'CV ID 9530 : Rotation Service'[All]", xlLabelOnly + xlFirstRow, True
     Selection.Font.ColorIndex = xlAutomatic
     Selection.Font.TintAndShade = 0
@@ -907,3 +1218,5 @@ Sub CBD_Report_Create_Pivot_Table()
         .MergeCells = False
     End With
 End Sub
+
+
