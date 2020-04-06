@@ -4,6 +4,7 @@ Option Explicit
     Dim DataSheet As Worksheet
     Dim LookupTable As Workbook
     Dim ExtractTable As ListObject
+    Dim CommentsErrorLog As String
 
 Sub Generate_CBD_Report()
     Application.ScreenUpdating = False
@@ -37,11 +38,12 @@ Sub CBD_Report_Format_Extract()
     
     Set fso = New Scripting.FileSystemObject
     
+    ' Message and File Dialog box to choose the Extract Data
     MsgBox "Choose Extract Data for the report."
     Set fd = Application.FileDialog(msoFileDialogOpen)
     
     fd.Filters.Clear
-    fd.Filters.Add "CSV Files", "*.csv"
+    fd.Filters.Add "Excel, CSV Files", "*.xl*, *.csv"
     fd.FilterIndex = 1
     
     fd.AllowMultiSelect = False
@@ -70,6 +72,9 @@ Sub CBD_Report_Format_Extract()
     Set DataSheet = DataWorkbook.Worksheets(1)
     DataSheet.Name = "DataExtract"
     
+    
+    
+    ' Message Box and File Dialog to choose the VLOOKUP Sheet
     MsgBox "Choose a VLOOKUP Table for the report."
     Set fd = Application.FileDialog(msoFileDialogOpen)
     
@@ -89,6 +94,10 @@ Sub CBD_Report_Format_Extract()
     End If
     
     Set LookupTable = Workbooks.Open(Filename:=fd.SelectedItems(1))
+    
+    
+    
+    ' Start formatting the Extract Data
     DataWorkbook.Activate
     
     ' Delete the first 3 rows
@@ -123,7 +132,7 @@ Sub CBD_Report_Format_Extract()
         LookAt:=xlPart, SearchOrder:=xlByRows, MatchCase:=False, SearchFormat:= _
         False, ReplaceFormat:=False
         
-    ' Create column EPA Code and Name adjacent to Type of Assessment Form
+    ' Create column EPA Code and Name adjacent to Type of Assessment Form column
     ExtractTable.ListColumns("Type of Assessment Form").Range.Select
     Selection.Insert Shift:=xlToRight, CopyOrigin:=xlFormatFromLeftOrAbove
     Set newCol = Selection.EntireColumn
@@ -207,23 +216,33 @@ Sub CBD_Report_Create_Pivot_Table()
         "PivotTable!R3C1", TableName:="CompletedEPAsPivotTable", DefaultVersion:=6
     Sheets("PivotTable").Select
     Cells(3, 1).Select
+    
+    ' Residents as first layer of rows
     With ActiveSheet.PivotTables("CompletedEPAsPivotTable").PivotFields("Resident")
         .Orientation = xlRowField
         .Position = 1
     End With
+    
+    ' EPA Code and Name as second layer of rows
     With ActiveSheet.PivotTables("CompletedEPAsPivotTable").PivotFields("EPA Code and Name")
         .Orientation = xlRowField
         .Position = 2
     End With
+    
+    ' Entrustment / Overall Category as columns
     With ActiveSheet.PivotTables("CompletedEPAsPivotTable").PivotFields( _
         "Entrustment / Overall Category")
         .Orientation = xlColumnField
         .Position = 1
     End With
+    
+    ' Count of Entrustment / Overall Category as values
     With ActiveSheet.PivotTables("CompletedEPAsPivotTable").PivotFields( _
         "Entrustment / Overall Category")
         .Orientation = xlDataField
     End With
+    
+    ' Style the pivot table
     Range("A4").Select
     ActiveSheet.PivotTables("CompletedEPAsPivotTable").CompactLayoutRowHeader = ""
     Range("B3").Select
@@ -368,7 +387,7 @@ Sub CBD_Report_Create_Comments_Lookup()
     Selection.PasteSpecial Paste:=xlPasteValues, Operation:=xlNone, SkipBlanks _
         :=False, Transpose:=False
     
-    ' Get all values from 2-3 Strengths
+    ' Get all values from 2-3 Actions or areas for improvement
     ExtractTable.ListColumns("2 - 3 Actions or areas for improvement").Range.Copy
     newSheet.Columns("D:D").Select
     Selection.PasteSpecial Paste:=xlPasteValues, Operation:=xlNone, SkipBlanks _
@@ -393,15 +412,60 @@ Sub CBD_Report_Create_Comments_Lookup()
     .Apply
     End With
     
+    CommentsErrorLog = ""
     Dim i As Long
+    ' currentColumn used for Error Handling with CommentsError
+    Dim currentColumn As Integer
+    
+
     For i = lastRow To 2 Step -1
         
+        If Not ActiveWorkbook.Name = DataWorkbook.Name Then
+            DataWorkbook.Activate
+            newSheet.Activate
+        End If
+        
+    
+        ' Ugly Proactive Error Checking (for #NAME errors in comments mostly)
+        ' If the errors on the next line of the strengths comments
+        If IsError(Cells(i - 1, 3).Value) Then
+            CommentsErrorLog = CommentsErrorLog & Cells(i - 1, 1).Value & " - " & Cells(i - 1, 2).Value & " - Strengths" & vbNewLine
+            Cells(i - 1, 3).Value = "Value Omitted: Excel Error"
+        End If
+        
+        ' If the Error wasn't caught by the previous iteration and is on this line of the strengths comments
+        If IsError(Cells(i, 3).Value) Then
+            CommentsErrorLog = CommentsErrorLog & Cells(i, 1).Value & " - " & Cells(i, 2).Value & " - Strengths" & vbNewLine
+            Cells(i, 3).Value = "Value Omitted: Excel Error"
+        End If
+        
+        ' If the errors on the next line of the weaknesses comments
+        If IsError(Cells(i - 1, 4).Value) Then
+            CommentsErrorLog = CommentsErrorLog & Cells(i - 1, 1).Value & " - " & Cells(i - 1, 2).Value & " - Weaknesses" & vbNewLine
+            Cells(i - 1, 4).Value = "Value Omitted: Excel Error"
+        End If
+
+        ' If the Error wasn't caught by the previous iteration and is on this line of the weaknesses comments
+        If IsError(Cells(i, 4).Value) Then
+            CommentsErrorLog = CommentsErrorLog & Cells(i, 1).Value & " - " & Cells(i, 2).Value & " - Weaknesses" & vbNewLine
+            Cells(i, 4).Value = "Value Omitted: Excel Error"
+        End If
+        
+        ' If the previous row contains the same Resident name and EPA, then append this rows comment values
         If Cells(i, 1).Value = Cells(i - 1, 1).Value And Cells(i, 2).Value = Cells(i - 1, 2).Value Then
+            
+            currentColumn = 3
+            
             Cells(i - 1, 3).Value = Cells(i - 1, 3).Value & vbNewLine & Cells(i, 3).Value
+
+            currentColumn = 4
+            
             Cells(i - 1, 4).Value = Cells(i - 1, 4).Value & vbNewLine & Cells(i, 4).Value
+
             Rows(i).EntireRow.Delete
         End If
     Next
+    On Error GoTo 0
     
     ' Insert a column before 2-3 Strengths with Resident Name & EPA Code and Name
     newSheet.Columns("C:C").Select
@@ -415,6 +479,9 @@ Sub CBD_Report_Create_Comments_Lookup()
     lastRow = ActiveSheet.UsedRange.Row - 1 + ActiveSheet.UsedRange.Rows.Count
     
     Range(ActiveCell, Cells(lastRow, ActiveCell.Column)).FormulaR1C1 = "=R[0]C[-2]&R[0]C[-1]"
+    
+    Exit Sub
+    
 
 End Sub
 
@@ -590,13 +657,14 @@ Sub CBD_Report_Create_Site_Pivot_Table_And_Copy()
     Dim i As Long
     
     DataWorkbook.Activate
-    Set PivotTableSheet = Worksheets("PivotTable")
+    Sheets.Add.Name = "PivotTableSite"
+    Set PivotTableSheet = Worksheets("PivotTableSite")
     
     ActiveWorkbook.PivotCaches.Create(SourceType:=xlDatabase, SourceData:= _
         "ExtractTable", Version:=6).CreatePivotTable TableDestination:= _
-        "PivotTable!R3C9", TableName:="SitePivotTable", DefaultVersion:=6
+        "PivotTableSite!R3C9", TableName:="SitePivotTable", DefaultVersion:=6
         
-    Sheets("PivotTable").Select
+    Sheets("PivotTableSite").Select
     Cells(3, 9).Select
     
     With ActiveSheet.PivotTables("SitePivotTable").PivotFields("Site")
@@ -657,13 +725,14 @@ Sub CBD_Report_Create_Block_Pivot_Table_And_Copy()
     Dim i As Long
     
     DataWorkbook.Activate
-    Set PivotTableSheet = Worksheets("PivotTable")
+    Sheets.Add.Name = "PivotTableBlock"
+    Set PivotTableSheet = Worksheets("PivotTableBlock")
     
     ActiveWorkbook.PivotCaches.Create(SourceType:=xlDatabase, SourceData:= _
         "ExtractTable", Version:=6).CreatePivotTable TableDestination:= _
-        "PivotTable!R3C18", TableName:="BlockPivotTable", DefaultVersion:=6
+        "PivotTableBlock!R3C18", TableName:="BlockPivotTable", DefaultVersion:=6
         
-    Sheets("PivotTable").Select
+    Sheets("PivotTableBlock").Select
     Cells(3, 18).Select
     
     With ActiveSheet.PivotTables("BlockPivotTable").PivotFields("Resident")
@@ -718,10 +787,16 @@ End Sub
 Sub CBD_Report_Cleanup()
     Application.DisplayAlerts = False
     DataWorkbook.Worksheets("PivotTable").Delete
+    DataWorkbook.Worksheets("PivotTableSite").Delete
+    DataWorkbook.Worksheets("PivotTableBlock").Delete
     DataWorkbook.Worksheets("CommentsLookup").Delete
     DataWorkbook.Worksheets("ResAn").Delete
     DataWorkbook.Worksheets("DataExtract").Delete
     LookupTable.Close
     Application.DisplayAlerts = True
+    If Len(CommentsErrorLog) > 0 Then
+        MsgBox Prompt:="There were Excel Errors (i.e. #NAME) that could not be removed.  They have been ommitted and " _
+            & "replaced with 'Value Omitted: Excel Error'. The following Residents, EPAs, and Comment columns are responsible:" _
+            & CommentsErrorLog
+    End If
 End Sub
-
