@@ -1,0 +1,40 @@
+Option Explicit
+
+Sub RollUpFunction()
+
+    Dim rollUpRange As Range
+    Dim keyRange As Range
+    Dim i As Integer
+    Dim currentRollCell As Range
+    
+    ActiveSheet.Copy After:=Worksheets(Sheets.Count)
+    ActiveSheet.name = "RollupSheet"
+    
+    
+    Set rollUpRange = Application.InputBox(Prompt:="Select the column to roll up.", Type:=8)
+    Set keyRange = Application.InputBox(Prompt:="Select the column to base the roll-up on. Selection must be the same size as the previous range.  Note: This operation deletes rows as it rolls them, non-roll-up column data may be lost.", _
+        Type:=8)
+        
+    If rollUpRange.Count <> keyRange.Count Then
+        MsgBox Prompt:="The size of the ranges selected do not match, operation aborted."
+        End
+    End If
+    
+    i = 1
+    Do While i <= rollUpRange.Count
+    
+        If keyRange.Cells(i) <> "" Then
+            Set currentRollCell = rollUpRange.Cells(i)
+        Else
+            currentRollCell.Value = currentRollCell.Value & vbNewLine & rollUpRange.Cells(i).Value
+        End If
+        
+        i = i + 1
+    Loop
+    
+    keyRange.EntireColumn.SpecialCells(xlCellTypeBlanks).EntireRow.Delete
+    
+    keyRange.Cells(1).CurrentRegion.VerticalAlignment = xlTop
+    
+        
+End Sub
