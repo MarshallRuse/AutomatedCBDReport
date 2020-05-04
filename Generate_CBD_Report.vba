@@ -1,12 +1,15 @@
 Option Explicit
 
+    Dim MacroSourceWorkbook As Workbook
     Dim DataWorkbook As Workbook
     Dim DataSheet As Worksheet
     Dim LookupTable As Workbook
     Dim ExtractTable As ListObject
     Dim CommentsErrorLog As String
+    Public cboEntrustmentLevelChoice As String
 
 Sub Generate_CBD_Report()
+    Set MacroSourceWorkbook = Application.ThisWorkbook
     Application.ScreenUpdating = False
     Call CBD_Report_Format_Extract
     Call CBD_Report_Create_Pivot_Table
@@ -35,6 +38,8 @@ Sub CBD_Report_Format_Extract()
     Dim blankCells As Range
     Dim fd As FileDialog
     Dim fileWasChosen As Boolean
+    Dim EntrustmentSelectionSheet As Worksheet
+    
     
     Set fso = New Scripting.FileSystemObject
     
@@ -70,7 +75,7 @@ Sub CBD_Report_Format_Extract()
     DataWorkbook.SaveAs DataWorkbook.Path & "\" & DataWorkbook.ActiveSheet.Range("B3").Value & _
         "_" & DataWorkbook.ActiveSheet.Range("B2").Value & ".xlsx", 51
     Set DataSheet = DataWorkbook.Worksheets(1)
-    DataSheet.Name = "DataExtract"
+    DataSheet.name = "DataExtract"
     
     
     
@@ -110,10 +115,69 @@ Sub CBD_Report_Format_Extract()
     
     ' Create a table from the data for ease of manipulation - allows use of column
     ' header names for flexibility
-    ActiveSheet.ListObjects.Add(xlSrcRange, Range("A1").CurrentRegion, , xlYes).Name = _
+    ActiveSheet.ListObjects.Add(xlSrcRange, Range("A1").CurrentRegion, , xlYes).name = _
         "ExtractTable"
     Set ExtractTable = ActiveSheet.ListObjects("ExtractTable")
+    
+    ' Ensure that only the expected values are present in Entrustment / Overall Cateogory
+    ' If not, then prompt the user to change them
+    Dim permittedEntrustments As String
+    Dim foundDiscrepancies As String
+    Dim discrepArr() As String
+    Dim entrustmentValues As Range
+    Dim cell As Range
+    
+    permittedEntrustments = "Excellence Autonomy Support Direction Intervention"
+    foundDiscrepancies = ""
+    
+    Set entrustmentValues = ExtractTable.ListColumns("Entrustment / Overall Category").Range.Offset(1, 0).Cells
+    If Not entrustmentValues Is Nothing Then
+        For Each cell In entrustmentValues
+            If cell <> "" And (InStr(permittedEntrustments, cell) = 0) And (InStr(foundDiscrepancies, cell & "|") = 0) Then
+                foundDiscrepancies = foundDiscrepancies & cell & "|"
+            End If
+        Next cell
+    End If
+    
+    If Len(foundDiscrepancies) > 0 Then
+        foundDiscrepancies = Left(foundDiscrepancies, Len(foundDiscrepancies) - 1)
+        discrepArr = Split(foundDiscrepancies, "|")
+    
+        ' MAKE A STRING OF NAMES TO PUT IN THE MESSAGE BOX
+        Dim discrepStr As String
+        Dim discrep As Variant
+        For Each discrep In discrepArr
+            discrepStr = discrepStr & discrep & "," & vbNewLine
+        Next discrep
+        If Len(discrepStr) > 0 Then discrepStr = Left(discrepStr, Len(discrepStr) - 2)
+            
+            MsgBox Prompt:="The following Entrustment categories are unrecognized: " & vbNewLine & discrepStr _
+                & vbNewLine & vbNewLine & "You will be prompted to replace each discrepancy with an appropriate category - 'Excellence', 'Autonomy', 'Support', 'Direction', or 'Intervention'." _
+                & vbNewLine & "Choose the appropriate Entrustment Level from the dropdown menu, and click Confirm Entrustment."
+            
+                
+            Dim properEntrustment As String
+            For Each discrep In discrepArr
+                ' Filter the table to only show the resident
+                ExtractTable.ListColumns("Entrustment / Overall Category").Range.AutoFilter Field:=ExtractTable.ListColumns("Entrustment / Overall Category").Range.Column, Criteria1 _
+                    :=discrep
+                        
+                ' Load and show the Entrustment Picker UserForm
+                Load frmEntrustmentPicker
+                frmEntrustmentPicker.lblRecordsToReplace.Caption = _
+                    "Choose an appropriate Entrustment Level for the records marked: " & discrep
+                frmEntrustmentPicker.Show
+                                
+                    
+                With ExtractTable.ListColumns("Entrustment / Overall Category")
+                    DataWorkbook.Worksheets("DataExtract").Range(DataWorkbook.Worksheets("DataExtract").Cells(2, .Index), _
+                        DataWorkbook.Worksheets("DataExtract").Cells(.Range.End(xlDown).Row, .Index)).Cells.SpecialCells(xlCellTypeVisible).Value = cboEntrustmentLevelChoice
+                End With
+            Next discrep
+            
+    End If
 
+    ExtractTable.ListColumns("Entrustment / Overall Category").Range.AutoFilter Field:=ExtractTable.ListColumns("Entrustment / Overall Category").Range.Column
     ' Rename the values in Entrustment / Overall Category
     ExtractTable.ListColumns("Entrustment / Overall Category").Range.Select
     Selection.Replace What:="Excellence", Replacement:="5. Excellence", LookAt _
@@ -140,7 +204,7 @@ Sub CBD_Report_Format_Extract()
     newHeader.FormulaR1C1 = "EPA Code and Name"
     ActiveCell.Offset(1, 0).Select
     ActiveCell.FormulaR1C1 = _
-        "=IFERROR(VLOOKUP([@[Assessment Form Code]],'[" & LookupTable.Name & "]VLOOKUP MASTER'!C1:C11,11,FALSE), ""NONEXISTANT_FORM_ID"")"
+        "=IFERROR(VLOOKUP([@[Assessment Form Code]],'[" & LookupTable.name & "]VLOOKUP MASTER'!C1:C11,11,FALSE), ""NONEXISTANT_FORM_ID"")"
     ExtractTable.ListColumns("EPA Code and Name").Range.EntireColumn.AutoFit
     
     'Loop through and make sure all EPA Codes are accounted for
@@ -163,7 +227,7 @@ Sub CBD_Report_Format_Extract()
     newHeader.FormulaR1C1 = "Site"
     ActiveCell.Offset(1, 0).Select
     ActiveCell.FormulaR1C1 = _
-        "=VLOOKUP([@[CV ID 9533 : Site]],'[" & LookupTable.Name & "]Site'!C1:C2,2,FALSE)"
+        "=VLOOKUP([@[CV ID 9533 : Site]],'[" & LookupTable.name & "]Site'!C1:C2,2,FALSE)"
     ExtractTable.ListColumns("Site").Range.EntireColumn.AutoFit
     
     ' Create column Block adjacent to Type of Assessment Form
@@ -174,7 +238,7 @@ Sub CBD_Report_Format_Extract()
     newHeader.FormulaR1C1 = "Block"
     ActiveCell.Offset(1, 0).Select
     ActiveCell.FormulaR1C1 = _
-        "=VLOOKUP([@[Date of encounter]],'[" & LookupTable.Name & "]BLOCK'!C2:C6,3,TRUE)"
+        "=VLOOKUP([@[Date of encounter]],'[" & LookupTable.name & "]BLOCK'!C2:C6,3,TRUE)"
     ExtractTable.ListColumns("Block").Range.EntireColumn.AutoFit
     
     ' Create column Resident from Assessee Lastname and Assessee Firstname
@@ -190,6 +254,11 @@ Sub CBD_Report_Format_Extract()
     
     ' Delete Rows with blank cells in Date of Assessment Form Submission
     Set blankCells = ExtractTable.ListColumns("Date of Assessment Form Submission").Range.SpecialCells(xlCellTypeBlanks)
+    If Not blankCells Is Nothing Then
+        blankCells.Delete xlUp
+    End If
+    ' Delete Rows with blank cells in Entrustment / Overall Category
+    Set blankCells = ExtractTable.ListColumns("Entrustment / Overall Category").Range.SpecialCells(xlCellTypeBlanks)
     If Not blankCells Is Nothing Then
         blankCells.Delete xlUp
     End If
@@ -209,7 +278,7 @@ Sub CBD_Report_Create_Pivot_Table()
     Dim lastCell As Range
     
     DataWorkbook.Activate
-    Sheets.Add.Name = "PivotTable"
+    Sheets.Add.name = "PivotTable"
     Set PivotTableSheet = Worksheets("PivotTable")
     ActiveWorkbook.PivotCaches.Create(SourceType:=xlDatabase, SourceData:= _
         "ExtractTable", Version:=6).CreatePivotTable TableDestination:= _
@@ -256,7 +325,7 @@ Sub CBD_Report_Create_Pivot_Table()
     Selection.CurrentRegion.Select
     Selection.Copy
     Set ResAnSheet = Sheets.Add(After:=ActiveSheet)
-    ResAnSheet.Name = "ResAn"
+    ResAnSheet.name = "ResAn"
     
     Selection.PasteSpecial Paste:=xlPasteFormats, Operation:=xlNone, _
         SkipBlanks:=False, Transpose:=False
@@ -327,7 +396,7 @@ Sub CBD_Report_Create_Pivot_Table()
     Set lastCell = Cells(Range("A2").End(xlDown).Row, Selection.Column)
     Range(firstCell, lastCell).Select
     Selection.FormulaR1C1 = _
-        "=VLOOKUP(RC1,'[" & LookupTable.Name & "]VLOOKUP MASTER'!C11:C12,2,FALSE)"
+        "=VLOOKUP(RC1,'[" & LookupTable.name & "]VLOOKUP MASTER'!C11:C12,2,FALSE)"
     Selection.SpecialCells(xlCellTypeFormulas, xlErrors).Clear
     Selection.Offset(0, -1).EntireColumn.Select
     Selection.Copy
@@ -367,7 +436,7 @@ Sub CBD_Report_Create_Comments_Lookup()
     DataWorkbook.Activate
     ' Create a new worksheet for the results
     Set newSheet = DataWorkbook.Worksheets.Add
-    newSheet.Name = "CommentsLookup"
+    newSheet.name = "CommentsLookup"
     
     ' Get all values from Residents Names
     ExtractTable.ListColumns("Resident").Range.Copy
@@ -420,7 +489,7 @@ Sub CBD_Report_Create_Comments_Lookup()
 
     For i = lastRow To 2 Step -1
         
-        If Not ActiveWorkbook.Name = DataWorkbook.Name Then
+        If Not ActiveWorkbook.name = DataWorkbook.name Then
             DataWorkbook.Activate
             newSheet.Activate
         End If
@@ -630,7 +699,7 @@ Sub CBD_Report_Add_Comments_to_Pivot_Copy()
     Selection.Copy
     
     Set ResidentAnalysisSheet = DataWorkbook.Worksheets.Add
-    ResidentAnalysisSheet.Name = "ResidentAnalysis"
+    ResidentAnalysisSheet.name = "ResidentAnalysis"
     DataWorkbook.Worksheets("ResidentAnalysis").Select
     
     Range("A1").Select
@@ -657,7 +726,7 @@ Sub CBD_Report_Create_Site_Pivot_Table_And_Copy()
     Dim i As Long
     
     DataWorkbook.Activate
-    Sheets.Add.Name = "PivotTableSite"
+    Sheets.Add.name = "PivotTableSite"
     Set PivotTableSheet = Worksheets("PivotTableSite")
     
     ActiveWorkbook.PivotCaches.Create(SourceType:=xlDatabase, SourceData:= _
@@ -694,7 +763,7 @@ Sub CBD_Report_Create_Site_Pivot_Table_And_Copy()
     Selection.Copy
     
     Set SiteSheet = Sheets.Add(After:=Worksheets("ResidentAnalysis"))
-    SiteSheet.Name = "SiteAnalysis"
+    SiteSheet.name = "SiteAnalysis"
     
     Selection.PasteSpecial Paste:=xlPasteFormats, Operation:=xlNone, _
         SkipBlanks:=False, Transpose:=False
@@ -725,7 +794,7 @@ Sub CBD_Report_Create_Block_Pivot_Table_And_Copy()
     Dim i As Long
     
     DataWorkbook.Activate
-    Sheets.Add.Name = "PivotTableBlock"
+    Sheets.Add.name = "PivotTableBlock"
     Set PivotTableSheet = Worksheets("PivotTableBlock")
     
     ActiveWorkbook.PivotCaches.Create(SourceType:=xlDatabase, SourceData:= _
@@ -762,7 +831,7 @@ Sub CBD_Report_Create_Block_Pivot_Table_And_Copy()
     Selection.Copy
     
     Set BlockSheet = Sheets.Add(After:=Worksheets("SiteAnalysis"))
-    BlockSheet.Name = "BlockAnalysis"
+    BlockSheet.name = "BlockAnalysis"
     
     Selection.PasteSpecial Paste:=xlPasteFormats, Operation:=xlNone, _
         SkipBlanks:=False, Transpose:=False
