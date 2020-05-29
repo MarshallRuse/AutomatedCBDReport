@@ -75,7 +75,7 @@ Sub CBD_Report_Format_Extract()
     DataWorkbook.SaveAs DataWorkbook.Path & "\" & DataWorkbook.ActiveSheet.Range("B3").Value & _
         "_" & DataWorkbook.ActiveSheet.Range("B2").Value & ".xlsx", 51
     Set DataSheet = DataWorkbook.Worksheets(1)
-    DataSheet.name = "DataExtract"
+    DataSheet.Name = "DataExtract"
     
     
     
@@ -115,7 +115,7 @@ Sub CBD_Report_Format_Extract()
     
     ' Create a table from the data for ease of manipulation - allows use of column
     ' header names for flexibility
-    ActiveSheet.ListObjects.Add(xlSrcRange, Range("A1").CurrentRegion, , xlYes).name = _
+    ActiveSheet.ListObjects.Add(xlSrcRange, Range("A1").CurrentRegion, , xlYes).Name = _
         "ExtractTable"
     Set ExtractTable = ActiveSheet.ListObjects("ExtractTable")
     
@@ -204,7 +204,7 @@ Sub CBD_Report_Format_Extract()
     newHeader.FormulaR1C1 = "EPA Code and Name"
     ActiveCell.Offset(1, 0).Select
     ActiveCell.FormulaR1C1 = _
-        "=IFERROR(VLOOKUP([@[Assessment Form Code]],'[" & LookupTable.name & "]VLOOKUP MASTER'!C1:C11,11,FALSE), ""NONEXISTANT_FORM_ID"")"
+        "=IFERROR(VLOOKUP([@[Assessment Form Code]],'[" & LookupTable.Name & "]VLOOKUP MASTER'!C1:C11,11,FALSE), ""NONEXISTANT_FORM_ID"")"
     ExtractTable.ListColumns("EPA Code and Name").Range.EntireColumn.AutoFit
     
     'Loop through and make sure all EPA Codes are accounted for
@@ -227,7 +227,7 @@ Sub CBD_Report_Format_Extract()
     newHeader.FormulaR1C1 = "Site"
     ActiveCell.Offset(1, 0).Select
     ActiveCell.FormulaR1C1 = _
-        "=VLOOKUP([@[CV ID 9533 : Site]],'[" & LookupTable.name & "]Site'!C1:C2,2,FALSE)"
+        "=VLOOKUP([@[CV ID 9533 : Site]],'[" & LookupTable.Name & "]Site'!C1:C2,2,FALSE)"
     ExtractTable.ListColumns("Site").Range.EntireColumn.AutoFit
     
     ' Create column Block adjacent to Type of Assessment Form
@@ -238,7 +238,7 @@ Sub CBD_Report_Format_Extract()
     newHeader.FormulaR1C1 = "Block"
     ActiveCell.Offset(1, 0).Select
     ActiveCell.FormulaR1C1 = _
-        "=VLOOKUP([@[Date of encounter]],'[" & LookupTable.name & "]BLOCK'!C2:C6,3,TRUE)"
+        "=" & Chr(34) & "(" & Chr(34) & "&VLOOKUP([@[Date of encounter]],'[" & LookupTable.Name & "]BLOCK'!C2:C6,5,TRUE)&" & Chr(34) & ") " & Chr(34) & "&VLOOKUP([@[Date of encounter]],'[" & LookupTable.Name & "]BLOCK'!C2:C6,3,TRUE)"
     ExtractTable.ListColumns("Block").Range.EntireColumn.AutoFit
     
     ' Create column Resident from Assessee Lastname and Assessee Firstname
@@ -258,11 +258,16 @@ Sub CBD_Report_Format_Extract()
         blankCells.Delete xlUp
     End If
     ' Delete Rows with blank cells in Entrustment / Overall Category
+    On Error GoTo NoBlanks
     Set blankCells = ExtractTable.ListColumns("Entrustment / Overall Category").Range.SpecialCells(xlCellTypeBlanks)
     If Not blankCells Is Nothing Then
         blankCells.Delete xlUp
     End If
+    On Error GoTo 0
     DataWorkbook.Activate
+    
+NoBlanks:
+    Resume Next
 End Sub
 
 Sub CBD_Report_Create_Pivot_Table()
@@ -278,7 +283,7 @@ Sub CBD_Report_Create_Pivot_Table()
     Dim lastCell As Range
     
     DataWorkbook.Activate
-    Sheets.Add.name = "PivotTable"
+    Sheets.Add.Name = "PivotTable"
     Set PivotTableSheet = Worksheets("PivotTable")
     ActiveWorkbook.PivotCaches.Create(SourceType:=xlDatabase, SourceData:= _
         "ExtractTable", Version:=6).CreatePivotTable TableDestination:= _
@@ -325,7 +330,7 @@ Sub CBD_Report_Create_Pivot_Table()
     Selection.CurrentRegion.Select
     Selection.Copy
     Set ResAnSheet = Sheets.Add(After:=ActiveSheet)
-    ResAnSheet.name = "ResAn"
+    ResAnSheet.Name = "ResAn"
     
     Selection.PasteSpecial Paste:=xlPasteFormats, Operation:=xlNone, _
         SkipBlanks:=False, Transpose:=False
@@ -396,7 +401,7 @@ Sub CBD_Report_Create_Pivot_Table()
     Set lastCell = Cells(Range("A2").End(xlDown).Row, Selection.Column)
     Range(firstCell, lastCell).Select
     Selection.FormulaR1C1 = _
-        "=VLOOKUP(RC1,'[" & LookupTable.name & "]VLOOKUP MASTER'!C11:C12,2,FALSE)"
+        "=VLOOKUP(RC1,'[" & LookupTable.Name & "]VLOOKUP MASTER'!C11:C12,2,FALSE)"
     Selection.SpecialCells(xlCellTypeFormulas, xlErrors).Clear
     Selection.Offset(0, -1).EntireColumn.Select
     Selection.Copy
@@ -436,7 +441,7 @@ Sub CBD_Report_Create_Comments_Lookup()
     DataWorkbook.Activate
     ' Create a new worksheet for the results
     Set newSheet = DataWorkbook.Worksheets.Add
-    newSheet.name = "CommentsLookup"
+    newSheet.Name = "CommentsLookup"
     
     ' Get all values from Residents Names
     ExtractTable.ListColumns("Resident").Range.Copy
@@ -489,7 +494,7 @@ Sub CBD_Report_Create_Comments_Lookup()
 
     For i = lastRow To 2 Step -1
         
-        If Not ActiveWorkbook.name = DataWorkbook.name Then
+        If Not ActiveWorkbook.Name = DataWorkbook.Name Then
             DataWorkbook.Activate
             newSheet.Activate
         End If
@@ -567,6 +572,7 @@ Sub CBD_Report_Add_Comments_to_Pivot_Copy()
     Dim nameCounter As Long
     Dim names() As String
     Dim lastCol As Long
+    Dim EPAsCol As Range
     
     Set CommentsLookupSheet = DataWorkbook.Worksheets("CommentsLookup")
     Set ResAnSheet = DataWorkbook.Worksheets("ResAn")
@@ -644,7 +650,7 @@ Sub CBD_Report_Add_Comments_to_Pivot_Copy()
     With Selection
         .ColumnWidth = 80
         .HorizontalAlignment = xlGeneral
-        .Cells(2, 0).HorizontalAlignment = xlCenter ' The header
+        .Cells(2, 1).HorizontalAlignment = xlCenter ' The header
         .WrapText = True
         .Orientation = 0
         .AddIndent = False
@@ -653,6 +659,11 @@ Sub CBD_Report_Add_Comments_to_Pivot_Copy()
         .ReadingOrder = xlContext
         .MergeCells = False
         .VerticalAlignment = xlCenter
+        
+        ' Delete the N/As in the column
+        .Replace What:="N/A", Replacement:="", LookAt _
+            :=xlPart, SearchOrder:=xlByRows, MatchCase:=False, SearchFormat:=False, _
+            ReplaceFormat:=False
     End With
     
     currRASCell.EntireColumn.Offset(0, 1).Select
@@ -668,6 +679,11 @@ Sub CBD_Report_Add_Comments_to_Pivot_Copy()
         .ReadingOrder = xlContext
         .MergeCells = False
         .VerticalAlignment = xlCenter
+        
+        ' Delete the N/As in the column
+        .Replace What:="N/A", Replacement:="", LookAt _
+            :=xlPart, SearchOrder:=xlByRows, MatchCase:=False, SearchFormat:=False, _
+            ReplaceFormat:=False
     End With
     
     ' Reformat the other columns
@@ -699,7 +715,7 @@ Sub CBD_Report_Add_Comments_to_Pivot_Copy()
     Selection.Copy
     
     Set ResidentAnalysisSheet = DataWorkbook.Worksheets.Add
-    ResidentAnalysisSheet.name = "ResidentAnalysis"
+    ResidentAnalysisSheet.Name = "ResidentAnalysis"
     DataWorkbook.Worksheets("ResidentAnalysis").Select
     
     Range("A1").Select
@@ -716,6 +732,49 @@ Sub CBD_Report_Add_Comments_to_Pivot_Copy()
     Range("B2").End(xlToRight).EntireColumn.Offset(0, -2).AutoFit
     Columns("A:A").ColumnWidth = 80
     
+    ' Colour-code the EPAs by stage (ie. TTD, FOD, COD, TTP)
+    ResidentAnalysisSheet.Activate
+    Set EPAsCol = ActiveSheet.Range("A3", Range("A3").End(xlDown))
+    
+    If Not EPAsCol Is Nothing Then
+        For Each cell In EPAsCol
+            If Left(cell.Value, 6) = "1. TTD" Then
+                With cell.Interior
+                    .Pattern = xlSolid
+                    .PatternColorIndex = xlAutomatic
+                    .Color = 15773696
+                    .TintAndShade = 0
+                    .PatternTintAndShade = 0
+                End With
+            ElseIf Left(cell.Value, 6) = "2. FOD" Then
+                With cell.Interior
+                    .Pattern = xlSolid
+                    .PatternColorIndex = xlAutomatic
+                    .Color = 5296274
+                    .TintAndShade = 0
+                    .PatternTintAndShade = 0
+                End With
+            ElseIf Left(cell.Value, 6) = "3. COD" Then
+                With cell.Interior
+                    .Pattern = xlSolid
+                    .PatternColorIndex = xlAutomatic
+                    .Color = 49407
+                    .TintAndShade = 0
+                    .PatternTintAndShade = 0
+                End With
+            ElseIf Left(cell.Value, 6) = "4. TTP" Then
+                With cell.Interior
+                    .Pattern = xlSolid
+                    .PatternColorIndex = xlAutomatic
+                    .Color = 16751001
+                    .TintAndShade = 0
+                    .PatternTintAndShade = 0
+                End With
+            End If
+        Next cell
+    End If
+    
+    
 End Sub
 
 Sub CBD_Report_Create_Site_Pivot_Table_And_Copy()
@@ -724,9 +783,12 @@ Sub CBD_Report_Create_Site_Pivot_Table_And_Copy()
     Dim SiteSheet As Worksheet
     Dim cell As Range
     Dim i As Long
+    Dim currYear As String
+    Dim currMonth As String
+    
     
     DataWorkbook.Activate
-    Sheets.Add.name = "PivotTableSite"
+    Sheets.Add.Name = "PivotTableSite"
     Set PivotTableSheet = Worksheets("PivotTableSite")
     
     ActiveWorkbook.PivotCaches.Create(SourceType:=xlDatabase, SourceData:= _
@@ -763,7 +825,7 @@ Sub CBD_Report_Create_Site_Pivot_Table_And_Copy()
     Selection.Copy
     
     Set SiteSheet = Sheets.Add(After:=Worksheets("ResidentAnalysis"))
-    SiteSheet.name = "SiteAnalysis"
+    SiteSheet.Name = "SiteAnalysis"
     
     Selection.PasteSpecial Paste:=xlPasteFormats, Operation:=xlNone, _
         SkipBlanks:=False, Transpose:=False
@@ -772,14 +834,35 @@ Sub CBD_Report_Create_Site_Pivot_Table_And_Copy()
     
     Cells.EntireColumn.AutoFit
     
+    currYear = CStr(Year(Date))
+    currMonth = CStr(Month(Date))
+    
+    
     For i = 0 To Range("A3", Range("A3").End(xlDown)).Count
         Set cell = Range("A3").Offset(i, 0)
-        If (Left(cell.Value, 6) <> "Block ") Then
+        If (Left(cell.Value, 2) <> "(2") Then
             With cell.EntireRow
                 .Font.ColorIndex = xlAutomatic
                 .Font.Bold = True
             End With
+            
+        Else
+            ' Bold the Block if it belongs to the current academic year
+            If currMonth > 6 Then
+                If Left(cell.Value, 5) = "(" & currYear Then
+                    cell.Font.ColorIndex = xlAutomatic
+                    cell.Font.Bold = True
+                End If
+            Else
+                If Mid(cell.Value, 7, 4) = currYear Then
+                    cell.Font.ColorIndex = xlAutomatic
+                    cell.Font.Bold = True
+                End If
+            End If
         End If
+        
+        
+        
     Next i
     
     Range("A1").Select
@@ -792,9 +875,11 @@ Sub CBD_Report_Create_Block_Pivot_Table_And_Copy()
     Dim BlockSheet As Worksheet
     Dim cell As Range
     Dim i As Long
+    Dim currYear As String
+    Dim currMonth As String
     
     DataWorkbook.Activate
-    Sheets.Add.name = "PivotTableBlock"
+    Sheets.Add.Name = "PivotTableBlock"
     Set PivotTableSheet = Worksheets("PivotTableBlock")
     
     ActiveWorkbook.PivotCaches.Create(SourceType:=xlDatabase, SourceData:= _
@@ -831,7 +916,7 @@ Sub CBD_Report_Create_Block_Pivot_Table_And_Copy()
     Selection.Copy
     
     Set BlockSheet = Sheets.Add(After:=Worksheets("SiteAnalysis"))
-    BlockSheet.name = "BlockAnalysis"
+    BlockSheet.Name = "BlockAnalysis"
     
     Selection.PasteSpecial Paste:=xlPasteFormats, Operation:=xlNone, _
         SkipBlanks:=False, Transpose:=False
@@ -840,13 +925,29 @@ Sub CBD_Report_Create_Block_Pivot_Table_And_Copy()
     
     Cells.EntireColumn.AutoFit
     
+    currYear = CStr(Year(Date))
+    currMonth = CStr(Month(Date))
+    
     For i = 0 To Range("A3", Range("A3").End(xlDown)).Count
         Set cell = Range("A3").Offset(i, 0)
-        If (Left(cell.Value, 6) <> "Block ") Then
+        If (Left(cell.Value, 2) <> "(2") Then
             With cell.EntireRow
                 .Font.ColorIndex = xlAutomatic
                 .Font.Bold = True
             End With
+        Else
+            ' Bold the Block if it belongs to the current academic year
+            If currMonth > 6 Then
+                If Left(cell.Value, 5) = "(" & currYear Then
+                    cell.Font.ColorIndex = xlAutomatic
+                    cell.Font.Bold = True
+                End If
+            Else
+                If Mid(cell.Value, 7, 4) = currYear Then
+                    cell.Font.ColorIndex = xlAutomatic
+                    cell.Font.Bold = True
+                End If
+            End If
         End If
     Next i
     
